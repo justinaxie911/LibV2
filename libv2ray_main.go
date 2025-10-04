@@ -248,8 +248,8 @@ CheckVersionX string
 This func will return libv2ray binding version and V2Ray version used.
 */
 func CheckVersionX() string {
-	var version = 27
-	return fmt.Sprintf("Lib v%d [ David ☭ | #FreePalestine🇵🇸], Xray-core v%s", version, v2core.Version())
+	var version = 33
+	return fmt.Sprintf("Lib v%d [#FreePalestine🇵🇸], Xray-core v%s", version, v2core.Version())
 }
 
 func measureInstDelay(ctx context.Context, inst *v2core.Instance, url string) (int64, error) {
