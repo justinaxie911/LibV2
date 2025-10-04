@@ -51,7 +51,7 @@ jobs:
          
          # Build the AAR file for all target architectures
          echo "Building for arm, arm64, 386, and amd64..."
-         gomobile bind -v -androidapi 19 -target=android/arm,android/arm64,android/386,android/amd64 -ldflags='-s -w' -o libv2ray.aar ./
+         gomobile bind -v -androidapi 21 -target=android/arm,android/arm64,android/386,android/amd64 -ldflags='-s -w' -o libv2ray.aar ./
          
          # Unzip the AAR to align all .so files
          unzip libv2ray.aar -d libv2ray_unzipped
