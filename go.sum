@@ -261,10 +261,8 @@ github.com/xtls/reality v0.0.0-20231112171332-de1173cf2b19 h1:capMfFYRgH9BCLd6A3
 github.com/xtls/reality v0.0.0-20231112171332-de1173cf2b19/go.mod h1:dm4y/1QwzjGaK17ofi0Vs6NpKAHegZky8qk6J2JJZAE=
 github.com/xtls/reality v0.0.0-20240429224917-ecc4401070cc h1:0Nj8T1n7F7+v4vRVroaJIvY6R0vNABLfPH+lzPHRJvI=
 github.com/xtls/reality v0.0.0-20240429224917-ecc4401070cc/go.mod h1:dm4y/1QwzjGaK17ofi0Vs6NpKAHegZky8qk6J2JJZAE=
-github.com/xtls/xray-core v1.8.11 h1:kcP9sV75/Ckk1DfRIMgZjYFA2vuYtQILCJl8Xei3pFY=
-github.com/xtls/xray-core v1.8.11/go.mod h1:CVRl+YN8jZxEpnhFRIj3wGmEfGsj4EQDWG4lDKyFRPk=
-github.com/xtls/xray-core v25.4.30 h1:x1wG7iC8xjVnlayGA+S4c7EUobx6Gg0ttSm2SFwLrik=
-github.com/xtls/xray-core v25.4.30/go.mod h1:h4A21+wcMIFDAqHzSKTXMZQr3lto6WOTUWodamVi/kM=
+github.com/xtls/xray-core v1.250911.0 h1:KMN8zVurAjHFixiUoFV/jwmzYohf27dQRntjV+8LQno=
+github.com/xtls/xray-core v1.250911.0/go.mod h1:LkqA/BFVtPS2e5fRzg/bkYas9nQu4Uztlx+/fjlLM9k=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.opencensus.io v0.18.0/go.mod h1:vKdFvxhtzZ9onBp9VKHK8z/sRpBMnKAsufL7wlDrCOA=
 go.opentelemetry.io/otel v1.15.1 h1:3Iwq3lfRByPaws0f6bU3naAqOR1n5IeDWd9390kWHa8=
