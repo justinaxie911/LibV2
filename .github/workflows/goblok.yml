@@ -11,7 +11,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -52,22 +51,13 @@ jobs:
         gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
 
     - name: Upload files to Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: lib
-          path: |
-            libv2ray.aar
-            libv2ray-sources.jar
-      
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: main
-          release_name: rel
-          files: libv2ray*r
-          prerelease: false
-          generate_release_notes: true
-          
+      uses: actions/upload-artifact@v3
+      with:
+        name: lib
+        path: |
+          libv2ray.aar
+          libv2ray-sources.jar
+
     - name: Create Release and Upload
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
@@ -79,8 +69,9 @@ jobs:
           
           Built from: ${{ github.sha }}
         files: |
-          ./libv2ray.aar
-          ./libv2ray-sources.jar
+          libv2ray.aar
+          libv2ray-sources.jar
+        prerelease: false
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
