@@ -41,6 +41,21 @@ jobs:
         go install golang.org/x/mobile/cmd/gomobile@latest
         export PATH=$PATH:$(go env GOPATH)/bin
         
+    - name: Create gomobile config for 16KB pages
+      run: |
+        mkdir -p ~/.gomobile
+        cat > ~/.gomobile/android-ndk-16k.json << 'EOF'
+        {
+          "Name": "android-ndk-16k",
+          "Compiler": "clang",
+          "Linker": "clang",
+          "Flags": [
+            "-Wl,-z,max-page-size=16384",
+            "-Wl,-z,common-page-size=16384"
+          ]
+        }
+        EOF
+        
     - name: Build
       run: |
         mkdir -p assets data
@@ -48,7 +63,7 @@ jobs:
         cp -v data/*.dat assets/
         gomobile init
         go mod tidy
-        gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+        gomobile bind -v -androidapi 21 -ldflags='-s -w -extldflags="-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"' ./
 
     - name: Upload files to Artifacts
       uses: actions/upload-artifact@v4
@@ -68,6 +83,9 @@ jobs:
           Automated release for ${{ github.ref_name }}
           
           Built from: ${{ github.sha }}
+          
+          Features:
+          - Supports 16KB page size for better memory efficiency on modern Android devices
         files: |
           libv2ray.aar
           libv2ray-sources.jar
