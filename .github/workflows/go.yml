@@ -5,6 +5,13 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,44 +20,52 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-      
     - name: Setup Golang
       uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
-      
+
     - name: Setup JDK
       uses: actions/setup-java@v4
       with:
         java-version: 17
         distribution: 'temurin'
-        
+
     - name: Setup Android SDK Tools
       uses: android-actions/setup-android@v3.2.0
       with:
         cmdline-tools-version: 10406996
-        
+
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1.4.2
       with:
         ndk-version: 'r26b'
         link-to-sdk: true
+
     - name: Setup Go Mobile
       run: |
         go install golang.org/x/mobile/cmd/gomobile@latest
-        export PATH=$PATH:~/go/bin
+        export PATH=$PATH:$(go env GOPATH)/bin
 
     - name: Build
       run: |
-         mkdir -p assets data
-         bash gen_assets.sh download
-         cp -v data/*.dat assets/
-         gomobile init
-         go mod tidy
-         gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
-    - name: Upload AndroidLibXrayLite to release
-      uses: svenstaro/upload-release-action@v2
+        mkdir -p assets data
+        bash gen_assets.sh download
+        cp -v data/*.dat assets/
+        gomobile init
+        go mod tidy
+        gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+
+    - name: Create Release and Upload
+      uses: softprops/action-gh-release@v1
       with:
-        file: ./libv2ray*r
-        tag: ${{ github.event.inputs.release_tag }}
-        file_glob: true
+        tag_name: ${{ github.event.inputs.release_tag }}
+        name: Release ${{ github.event.inputs.release_tag }}
+        body: |
+          Automated release for ${{ github.event.inputs.release_tag }}
+          
+          Built from: ${{ github.sha }}
+        files: ./libv2ray*
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
