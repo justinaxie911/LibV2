@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/dev7dev/uri-to-json v0.0.0-20240528114356-f8873932b519
-	github.com/xtls/xray-core v25.4.30
+	github.com/xtls/xray-core v1.8.13
 	golang.org/x/mobile v0.0.0-20240506190922-a1a533f289d3
 	golang.org/x/sys v0.20.0
 )
