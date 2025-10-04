@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     branches: [ "main" ]
-    tags: [ "v*" ]  # ← TAMBAHKAN INI
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -40,7 +40,7 @@ jobs:
     - name: Setup Go Mobile
       run: |
         go install golang.org/x/mobile/cmd/gomobile@latest
-        export PATH=$PATH:~/go/bin
+        export PATH=$PATH:$(go env GOPATH)/bin
 
     - name: Build
       run: |
@@ -52,13 +52,18 @@ jobs:
         gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
 
     - name: Create Release and Upload
-      if: startsWith(github.ref, 'refs/tags/')  # ← Hanya jalankan saat tag
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref_name }}  # ← Gunakan tag dari trigger
+        tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
-        body: Automated release for ${{ github.ref_name }}
-        files: ./libv2ray*
+        body: |
+          Automated release for ${{ github.ref_name }}
+          
+          Built from: ${{ github.sha }}
+        files: |
+          ./libv2ray.aar
+          ./libv2ray-sources.jar
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
