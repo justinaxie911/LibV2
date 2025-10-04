@@ -1,13 +1,12 @@
-name: Android Native Build
+name: Build
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
-
-    jobs:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+jobs:
   build:
     runs-on: ubuntu-latest
     steps:
@@ -15,7 +14,6 @@ on:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-      
     - name: Setup Golang
       uses: actions/setup-go@v4
       with:
@@ -37,22 +35,48 @@ on:
       with:
         ndk-version: 'r26b'
         link-to-sdk: true
+        
     - name: Setup Go Mobile
       run: |
         go install golang.org/x/mobile/cmd/gomobile@latest
         export PATH=$PATH:~/go/bin
 
-    - name: Build
+    - name: Build and Align for All Architectures
       run: |
          mkdir -p assets data
          bash gen_assets.sh download
          cp -v data/*.dat assets/
          gomobile init
          go mod tidy
-         gomobile bind -v -androidapi 19 -ldflags='-s -w' ./
+         
+         # Build the AAR file for all target architectures
+         echo "Building for arm, arm64, 386, and amd64..."
+         gomobile bind -v -androidapi 19 -target=android/arm,android/arm64,android/386,android/amd64 -ldflags='-s -w' -o libv2ray.aar ./
+         
+         # Unzip the AAR to align all .so files
+         unzip libv2ray.aar -d libv2ray_unzipped
+         
+         # Find and align all .so files to 16KB
+         echo "Aligning all native libraries (.so) to 16KB..."
+         for so_file in $(find libv2ray_unzipped -name "*.so"); do
+           echo "Aligning $so_file..."
+           zipalign -p -f 4096 "$so_file" "aligned_temp.so"
+           mv "aligned_temp.so" "$so_file"
+         done
+         
+         # Re-package the AAR with the aligned libs
+         echo "Re-packaging the AAR..."
+         cd libv2ray_unzipped
+         zip -r ../libv2ray.aar *
+         cd ..
+         
+         # Verify the 16KB alignment for the final AAR
+         echo "Verifying final AAR alignment..."
+         zipalign -c -v 16384 libv2ray.aar
+
     - name: Upload AndroidLibXrayLite to release
       uses: svenstaro/upload-release-action@v2
       with:
-        file: ./libv2ray*r
+        file: ./libv2ray.aar
         tag: ${{ github.event.inputs.release_tag }}
-        file_glob: true
+        file_glob: false
