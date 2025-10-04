@@ -1,0 +1,64 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]  # ← TAMBAHKAN INI
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Golang
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+      
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: 17
+        distribution: 'temurin'
+        
+    - name: Setup Android SDK Tools
+      uses: android-actions/setup-android@v3.2.0
+      with:
+        cmdline-tools-version: 10406996
+        
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1.4.2
+      with:
+        ndk-version: 'r26b'
+        link-to-sdk: true
+        
+    - name: Setup Go Mobile
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        export PATH=$PATH:~/go/bin
+
+    - name: Build
+      run: |
+        mkdir -p assets data
+        bash gen_assets.sh download
+        cp -v data/*.dat assets/
+        gomobile init
+        go mod tidy
+        gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+
+    - name: Create Release and Upload
+      if: startsWith(github.ref, 'refs/tags/')  # ← Hanya jalankan saat tag
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}  # ← Gunakan tag dari trigger
+        name: Release ${{ github.ref_name }}
+        body: Automated release for ${{ github.ref_name }}
+        files: ./libv2ray*
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
