@@ -40,29 +40,15 @@ jobs:
       run: |
         go install golang.org/x/mobile/cmd/gomobile@latest
         export PATH=$PATH:$(go env GOPATH)/bin
-        
-    - name: Create gomobile config for 16KB pages
-      run: |
-        mkdir -p ~/.gomobile
-        cat > ~/.gomobile/android-ndk-16k.json << 'EOF'
-        {
-          "Name": "android-ndk-16k",
-          "Compiler": "clang",
-          "Linker": "clang",
-          "Flags": [
-            "-Wl,-z,max-page-size=16384",
-            "-Wl,-z,common-page-size=16384"
-          ]
-        }
-        EOF
+        gomobile init
         
     - name: Build
       run: |
         mkdir -p assets data
         bash gen_assets.sh download
         cp -v data/*.dat assets/
-        gomobile init
         go mod tidy
+        # 修复链接器标志
         gomobile bind -v -androidapi 21 -ldflags='-s -w -extldflags="-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"' ./
 
     - name: Upload files to Artifacts
