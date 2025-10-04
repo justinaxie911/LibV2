@@ -1,69 +1,134 @@
-name: Build and Release
+name: Android Native Build
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  NDK_VERSION: '25.2.9519653'
 
 jobs:
   build:
+    name: Build Android Libraries
     runs-on: ubuntu-latest
+    
     steps:
-
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Setup Golang
+    - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version-file: 'go.mod'
-      
-    - name: Setup JDK
-      uses: actions/setup-java@v4
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
       with:
-        java-version: 17
-        distribution: 'temurin'
-        
-    - name: Setup Android SDK Tools
-      uses: android-actions/setup-android@v3.2.0
-      with:
-        cmdline-tools-version: 10406996
-        
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - name: Setup Android NDK
-      uses: nttld/setup-ndk@v1.4.2
+      uses: android-actions/setup-android@v3
       with:
-        ndk-version: 'r26b'
-        link-to-sdk: true
-        
-    - name: Setup Go Mobile
-      run: |
-        go install golang.org/x/mobile/cmd/gomobile@latest
-        export PATH=$PATH:$(go env GOPATH)/bin
+        ndk-version: ${{ env.NDK_VERSION }}
 
-    - name: Build
+    - name: Build for all architectures
       run: |
-        mkdir -p assets data
-        bash gen_assets.sh download
-        cp -v data/*.dat assets/
-        gomobile init
-        go mod tidy
-        gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+        chmod +x build_android.sh
+        ./build_android.sh
 
-    - name: Create Release and Upload
+    - name: Test library compatibility
+      run: |
+        for arch in arm64-v8a armeabi-v7a x86 x86_64; do
+          if [ -f "dist/$arch/libv2ray.so" ]; then
+            echo "Testing $arch..."
+            $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf -l dist/$arch/libv2ray.so | grep "LOAD" || true
+          fi
+        done
+
+    - name: Create build info
+      run: |
+        echo "Build Date: $(date)" > build-info.txt
+        echo "Commit: ${{ github.sha }}" >> build-info.txt
+        echo "Android NDK: ${{ env.NDK_VERSION }}" >> build-info.txt
+        echo "Go Version: ${{ env.GO_VERSION }}" >> build-info.txt
+
+    - name: List built files
+      run: |
+        echo "=== Built Libraries ==="
+        find dist/ -name "*.so" -type f | head -20
+        echo "=== Total files ==="
+        find dist/ -name "*.so" -type f | wc -l
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-libraries
+        path: |
+          dist/
+          build-info.txt
+        retention-days: 30
+
+    - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
+      id: create_release  # ← TAMBAHKAN ID
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        body: |
-          Automated release for ${{ github.ref_name }}
-          
-          Built from: ${{ github.sha }}
         files: |
-          ./libv2ray.aar
-          ./libv2ray-sources.jar
+          dist/**/*.so
+          build-info.txt
+        draft: false
+        prerelease: false
         generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate Download URLs
+      if: startsWith(github.ref, 'refs/tags/')
+      id: download_urls
+      run: |
+        # Get the first .so file as example
+        FIRST_SO_FILE=$(find dist/ -name "*.so" -type f | head -1 | xargs basename)
+        ARCH_DIR=$(find dist/ -name "*.so" -type f | head -1 | xargs dirname | xargs basename)
+        
+        echo "RELEASE_URL=https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "EXAMPLE_SO_URL=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dist/$ARCH_DIR/$FIRST_SO_FILE" >> $GITHUB_OUTPUT
+        echo "BUILD_INFO_URL=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/build-info.txt" >> $GITHUB_OUTPUT
+        
+        # Count architectures
+        ARCH_COUNT=$(find dist/ -maxdepth 1 -type d | grep -v "^dist$" | wc -l)
+        echo "ARCHITECTURES=$ARCH_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Output Release Information
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "🎉 ANDROID LIBRARIES RELEASED!"
+        echo "==============================="
+        echo "📦 Release Page: ${{ steps.download_urls.outputs.RELEASE_URL }}"
+        echo ""
+        echo "🏗️ Build Information:"
+        echo "• Android NDK: ${{ env.NDK_VERSION }}"
+        echo "• Go Version: ${{ env.GO_VERSION }}"
+        echo "• Architectures: ${{ steps.download_urls.outputs.ARCHITECTURES }}"
+        echo ""
+        echo "⬇️ DIRECT DOWNLOAD LINKS:"
+        echo "• Build Info: ${{ steps.download_urls.outputs.BUILD_INFO_URL }}"
+        echo "• Example Library ($(find dist/ -name "*.so" -type f | head -1 | xargs dirname | xargs basename)): ${{ steps.download_urls.outputs.EXAMPLE_SO_URL }}"
+        echo ""
+        echo "📁 Available Architectures:"
+        for arch_dir in dist/*/; do
+          if [ -d "$arch_dir" ]; then
+            arch=$(basename "$arch_dir")
+            so_file=$(find "$arch_dir" -name "*.so" -type f | head -1 | xargs basename)
+            echo "  - $arch: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dist/$arch/$so_file"
+          fi
+        done
+        echo ""
+        echo "💡 All libraries are available in the release assets above ↑"
