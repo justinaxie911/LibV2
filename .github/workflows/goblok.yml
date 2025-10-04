@@ -1,91 +1,82 @@
-name: Build and Release
+name: Android Native Build
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  NDK_VERSION: '25.2.9519653'
 
 jobs:
   build:
+    name: Build Android Libraries
     runs-on: ubuntu-latest
+    
     steps:
-
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Setup Golang
+    - name: Setup Go
       uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
-      
-    - name: Setup JDK
-      uses: actions/setup-java@v4
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
       with:
-        java-version: 17
-        distribution: 'temurin'
-        
-    - name: Setup Android SDK Tools
-      uses: android-actions/setup-android@v3.2.0
-      with:
-        cmdline-tools-version: 10406996
-        
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - name: Setup Android NDK
-      uses: nttld/setup-ndk@v1.4.2
+      uses: android-actions/setup-android@v3
       with:
-        ndk-version: 'r26b'
-        link-to-sdk: true
-        
-    - name: Setup Go Mobile
-      run: |
-        go install golang.org/x/mobile/cmd/gomobile@latest
-        export PATH=$PATH:$(go env GOPATH)/bin
+        ndk-version: ${{ env.NDK_VERSION }}
 
-    - name: Build
+    - name: Build for all architectures
       run: |
-        mkdir -p assets data
-        bash gen_assets.sh download
-        cp -v data/*.dat assets/
-        gomobile init
-        go mod tidy
-        gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+        chmod +x build_android.sh
+        ./build_android.sh
 
-    - name: List built files
+    - name: Test library compatibility
       run: |
-        echo "=== Built files ==="
-        find . -name "*.aar" -o -name "*.jar" | head -20
+        for arch in arm64-v8a armeabi-v7a x86 x86_64; do
+          if [ -f "dist/$arch/libv2ray.so" ]; then
+            echo "Testing $arch..."
+            $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf -l dist/$arch/libv2ray.so | grep "LOAD" || true
+          fi
+        done
 
-    - name: Create Release and Upload
+    - name: Create build info
+      run: |
+        echo "Build Date: $(date)" > build-info.txt
+        echo "Commit: ${{ github.sha }}" >> build-info.txt
+        echo "Android NDK: ${{ env.NDK_VERSION }}" >> build-info.txt
+        echo "Go Version: ${{ env.GO_VERSION }}" >> build-info.txt
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-libraries
+        path: |
+          dist/
+          build-info.txt
+        retention-days: 30
+
+    - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
-      id: create_release  # ← TAMBAHKAN ID
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        body: |
-          Automated release for ${{ github.ref_name }}
-          
-          Built from: ${{ github.sha }}
-          
-          **Download Links:**
-          - AAR File: Will be available after upload
-          - Sources JAR: Will be available after upload
         files: |
-          ./*.aar
-          ./*.jar
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Output Download URLs
-      if: startsWith(github.ref, 'refs/tags/')
-      run: |
-        echo "🎉 Release created successfully!"
-        echo "📦 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-        echo ""
-        echo "⬇️ Download Links:"
-        echo "• AAR File: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$(ls *.aar | head -1)"
-        echo "• Sources JAR: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$(ls *.jar | head -1)"
-        echo ""
-        echo "🔗 Direct download URLs will be available once files are uploaded"
+          dist/**/*.so
+          build-info.txt
+        draft: false
+        prerelease: false
